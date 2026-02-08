@@ -17,7 +17,12 @@ const Root = (
       <Auth0Provider
         domain={import.meta.env.VITE_AUTH0_DOMAIN}
         clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
-        authorizationParams={{ redirect_uri: window.location.origin }}
+        authorizationParams={{
+          redirect_uri: `${window.location.origin}/callback`,
+          scope: "openid profile email"
+        }}
+        useRefreshTokens={true}
+        cacheLocation="localstorage"
       >
         <BrowserRouter>
           <App />

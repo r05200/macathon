@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from "react-router-dom"
 import NavItem from "../components/NavItem"
 import Badge from "../components/Badge"
+import { useAuth0 } from "@auth0/auth0-react"
 
 const NAV_ITEMS = [
   { path: "/app/overview", label: "Overview" },
@@ -23,6 +24,7 @@ const PAGE_TITLES: Record<string, string> = {
 export default function AppShell() {
   const location = useLocation()
   const title = PAGE_TITLES[location.pathname] ?? "Tracker Dashboard"
+  const { user } = useAuth0()
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -40,7 +42,21 @@ export default function AppShell() {
       <main className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-10 flex items-center justify-between h-14 px-6 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
           <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
-          <Badge>Mock data</Badge>
+          <div className="flex items-center gap-3">
+            <Badge>Mock data</Badge>
+            {user && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                {user.picture && (
+                  <img
+                    src={user.picture}
+                    alt={user.name || "User"}
+                    className="w-7 h-7 rounded-full"
+                  />
+                )}
+                <span className="font-medium">{user.name || user.email}</span>
+              </div>
+            )}
+          </div>
         </header>
 
         <div className="flex-1 p-6 overflow-auto">
