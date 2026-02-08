@@ -29,7 +29,7 @@ app.add_middleware(
 #     return {"response": response}
 
 
-@app.get("/api/snowflake/url-data")
+@app.get("/api/snowflake/get_url_data")
 async def snowflake_url_data():
     """GET: returns both predefined Snowflake result sets."""
     return snowflake_db.get_url_data()
