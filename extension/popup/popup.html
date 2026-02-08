@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=350, height=380">
+  <title>Privacy Shield</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-title">
+        <span class="shield-icon">🛡️</span>
+        <h1>Privacy Shield</h1>
+      </div>
+      <div class="status-indicator" id="statusIndicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Syncing...</span>
+      </div>
+    </header>
+
+    <!-- Login Section -->
+    <section class="login-section" id="loginSection">
+      <div class="login-collapsed" id="loginCollapsed">
+        <span class="login-email" id="displayEmail">Not logged in</span>
+        <button class="btn-small" id="changeEmailBtn">Login</button>
+      </div>
+      <div class="login-expanded hidden" id="loginExpanded">
+        <input 
+          type="email" 
+          id="emailInput" 
+          placeholder="Enter your email to sync data"
+          class="email-input"
+        >
+        <div class="login-buttons">
+          <button class="btn btn-primary" id="saveEmailBtn">Save</button>
+          <button class="btn btn-secondary" id="cancelEmailBtn">Cancel</button>
+        </div>
+        <p class="login-hint">Your email links this browser to your dashboard where you can manage blocked trackers.</p>
+      </div>
+    </section>
+
+    <!-- Sync Status Banner -->
+    <section class="sync-banner" id="syncBanner">
+      <div class="sync-info">
+        <span class="sync-icon">🔄</span>
+        <span id="syncStatus">Blocklist: 0 domains | Last sync: Never</span>
+      </div>
+      <button class="btn-small btn-link" id="forceSyncBtn">Sync Now</button>
+    </section>
+
+    <!-- Current Page Stats -->
+    <section class="stats-section">
+      <h2 class="section-title">Current Page</h2>
+      <div class="current-url" id="currentUrl">Loading...</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-number" id="totalCookies">-</span>
+          <span class="stat-label">Cookies</span>
+        </div>
+        <div class="stat-card warning">
+          <span class="stat-number" id="thirdPartyCookies">-</span>
+          <span class="stat-label">3rd Party</span>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-number" id="trackersDetected">-</span>
+          <span class="stat-label">Trackers</span>
+        </div>
+        <div class="stat-card success">
+          <span class="stat-number" id="trackersBlocked">-</span>
+          <span class="stat-label">Blocked</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-link" id="openDashboardFooter">Open Dashboard</span>
+      <span class="version">v0.2.0</span>
+    </footer>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

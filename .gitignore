@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Logs
 logs
 *.log
@@ -34,3 +35,6 @@ venv.bak/
 *.njsproj
 *.sln
 *.sw?
+=======
+node_modules
+>>>>>>> extension
