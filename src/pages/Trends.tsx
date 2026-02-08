@@ -9,6 +9,7 @@ import {
   Legend,
 } from "recharts"
 import Panel from "../components/Panel.tsx"
+import { useUserEmail } from "../hooks/useUserEmail"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
@@ -41,15 +42,24 @@ function mergeDaily(trackers: DailyCount[], cookies: DailyCount[]): MergedPoint[
 }
 
 export default function Trends() {
+  const email = useUserEmail()
   const [range, setRange] = useState<Range>("7d")
   const [trackerDaily, setTrackerDaily] = useState<DailyCount[]>([])
   const [cookieDaily, setCookieDaily] = useState<DailyCount[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!email) {
+      setLoading(false)
+      setTrackerDaily([])
+      setCookieDaily([])
+      return
+    }
+
     const days = rangeToDays(range)
     setLoading(true)
-    fetch(`${API_URL}/api/trends?days=${days}`)
+    const params = new URLSearchParams({ email, days: String(days) })
+    fetch(`${API_URL}/api/trends?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setTrackerDaily(data.trackerDaily || [])
@@ -59,7 +69,7 @@ export default function Trends() {
         console.error("Failed to fetch trends:", err)
       })
       .finally(() => setLoading(false))
-  }, [range])
+  }, [range, email])
 
   const merged = useMemo(() => mergeDaily(trackerDaily, cookieDaily), [trackerDaily, cookieDaily])
 

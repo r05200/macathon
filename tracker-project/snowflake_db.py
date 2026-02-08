@@ -358,48 +358,53 @@ class SnowflakeDB:
     # OVERVIEW / DASHBOARD OPERATIONS
     # ============================================
 
-    def get_overview_stats(self) -> Dict:
+    def get_overview_stats(self, email: str = "") -> Dict:
         """
         Get overview statistics: total trackers, unique sites, events by day, categories.
         Returns all data needed for the frontend overview page.
+        Filters by EMAIL_ID when email is provided.
         """
         conn = self._get_connection()
         cursor = conn.cursor(snowflake.connector.DictCursor)
 
+        email_filter = " WHERE EMAIL_ID = %s" if email else ""
+        email_and = " AND EMAIL_ID = %s" if email else ""
+        params = (email,) if email else ()
+
         try:
             # Total trackers
-            cursor.execute("SELECT COUNT(*) as TOTAL FROM URL_DATA")
+            cursor.execute(f"SELECT COUNT(*) as TOTAL FROM URL_DATA{email_filter}", params)
             total_trackers = cursor.fetchone()['TOTAL']
 
             # Unique sites (unique initiator domains)
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT COUNT(DISTINCT INITIATOR) as TOTAL
                 FROM URL_DATA
-                WHERE INITIATOR IS NOT NULL AND INITIATOR != ''
-            """)
+                WHERE INITIATOR IS NOT NULL AND INITIATOR != ''{email_and}
+            """, params)
             unique_sites = cursor.fetchone()['TOTAL']
 
             # Events per day (last 7 days)
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     TO_CHAR(CREATED_AT, 'YYYY-MM-DD') as DATE,
                     COUNT(*) as VALUE
                 FROM URL_DATA
-                WHERE CREATED_AT >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+                WHERE CREATED_AT >= DATEADD(day, -7, CURRENT_TIMESTAMP()){email_and}
                 GROUP BY TO_CHAR(CREATED_AT, 'YYYY-MM-DD')
                 ORDER BY DATE
-            """)
+            """, params)
             daily_events = [dict(row) for row in cursor.fetchall()]
 
             # Categories ranked by count
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     COALESCE(NULLIF(CATEGORY, ''), 'unknown') as CATEGORY,
                     COUNT(*) as COUNT
-                FROM URL_DATA
+                FROM URL_DATA{email_filter}
                 GROUP BY COALESCE(NULLIF(CATEGORY, ''), 'unknown')
                 ORDER BY COUNT DESC
-            """)
+            """, params)
             categories = [dict(row) for row in cursor.fetchall()]
 
             return {
@@ -417,24 +422,28 @@ class SnowflakeDB:
     # TRENDS OPERATIONS
     # ============================================
 
-    def get_trends_data(self, days: int = 7) -> Dict:
+    def get_trends_data(self, days: int = 7, email: str = "") -> Dict:
         """
         Get daily tracker counts for the trends page.
         Returns tracker counts per day for the given range.
+        Filters by EMAIL_ID when email is provided.
         """
         conn = self._get_connection()
         cursor = conn.cursor(snowflake.connector.DictCursor)
 
+        email_and = " AND EMAIL_ID = %s" if email else ""
+        params = (days, email) if email else (days,)
+
         try:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     TO_CHAR(CREATED_AT, 'YYYY-MM-DD') as DATE,
                     COUNT(*) as COUNT
                 FROM URL_DATA
-                WHERE CREATED_AT >= DATEADD(day, -%s, CURRENT_TIMESTAMP())
+                WHERE CREATED_AT >= DATEADD(day, -%s, CURRENT_TIMESTAMP()){email_and}
                 GROUP BY TO_CHAR(CREATED_AT, 'YYYY-MM-DD')
                 ORDER BY DATE
-            """, (days,))
+            """, params)
             tracker_daily = [dict(row) for row in cursor.fetchall()]
 
             return {
@@ -449,63 +458,68 @@ class SnowflakeDB:
     # BREAKDOWN OPERATIONS
     # ============================================
 
-    def get_breakdown_stats(self) -> Dict:
+    def get_breakdown_stats(self, email: str = "") -> Dict:
         """
         Get breakdown stats: top initiators, top domains, company groups.
         Returns all data needed for the Breakdown (Trackers) page.
+        Filters by EMAIL_ID when email is provided.
         """
         conn = self._get_connection()
         cursor = conn.cursor(snowflake.connector.DictCursor)
 
+        email_filter = " WHERE EMAIL_ID = %s" if email else ""
+        email_and = " AND EMAIL_ID = %s" if email else ""
+        params = (email,) if email else ()
+
         try:
             # Total trackers
-            cursor.execute("SELECT COUNT(*) as TOTAL FROM URL_DATA")
+            cursor.execute(f"SELECT COUNT(*) as TOTAL FROM URL_DATA{email_filter}", params)
             total_trackers = cursor.fetchone()['TOTAL']
 
             # Top 5 by initiator
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT INITIATOR, SUM(OCCURRENCES) as COUNT
                 FROM URL_DATA
-                WHERE INITIATOR IS NOT NULL AND INITIATOR != ''
+                WHERE INITIATOR IS NOT NULL AND INITIATOR != ''{email_and}
                 GROUP BY INITIATOR
                 ORDER BY COUNT DESC
                 LIMIT 5
-            """)
+            """, params)
             top_by_initiator = [dict(row) for row in cursor.fetchall()]
 
             # Top 5 by domain
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT DOMAIN_NAME, COMPANY, SUM(OCCURRENCES) as COUNT
-                FROM URL_DATA
+                FROM URL_DATA{email_filter}
                 GROUP BY DOMAIN_NAME, COMPANY
                 ORDER BY COUNT DESC
                 LIMIT 5
-            """)
+            """, params)
             top_by_domain = [dict(row) for row in cursor.fetchall()]
 
             # Company groups with domains
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     COALESCE(NULLIF(COMPANY, ''), 'Unknown') as COMPANY,
                     DOMAIN_NAME,
                     COALESCE(NULLIF(CATEGORY, ''), 'unknown') as CATEGORY,
                     SUM(OCCURRENCES) as TOTAL_HITS,
                     COUNT(*) as ENTRY_COUNT
-                FROM URL_DATA
+                FROM URL_DATA{email_filter}
                 GROUP BY COALESCE(NULLIF(COMPANY, ''), 'Unknown'), DOMAIN_NAME, COALESCE(NULLIF(CATEGORY, ''), 'unknown')
                 ORDER BY COMPANY, TOTAL_HITS DESC
-            """)
+            """, params)
             company_domain_rows = [dict(row) for row in cursor.fetchall()]
 
             # All trackers for the table
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     ID, DOMAIN_NAME, FULL_URL, INITIATOR, COMPANY,
                     CATEGORY, OCCURRENCES, CREATED_AT
-                FROM URL_DATA
+                FROM URL_DATA{email_filter}
                 ORDER BY CREATED_AT DESC
                 LIMIT 500
-            """)
+            """, params)
             all_trackers = [dict(row) for row in cursor.fetchall()]
 
             return {

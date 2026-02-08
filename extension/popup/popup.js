@@ -70,13 +70,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function initializePopup() {
   // Load saved data
   const stored = await chrome.storage.local.get([
-    'userEmail', 
-    'blockedDomains', 
+    'userEmail',
+    'blockedDomains',
     'lastSync',
     'config',
     'deviceId'
   ]);
-  
+
   state.userEmail = stored.userEmail || null;
   state.blockedDomains = stored.blockedDomains || [];
   state.lastSync = stored.lastSync || null;
@@ -86,11 +86,17 @@ async function initializePopup() {
   // Update UI
   updateEmailDisplay();
   updateSyncStatus();
+  updateLoginGate();
+
+  // If not logged in, stop here — don't load any data
+  if (!state.userEmail) {
+    return;
+  }
 
   // Get current tab info
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   state.currentTab = tab;
-  
+
   if (tab?.url) {
     try {
       const url = new URL(tab.url);
@@ -99,14 +105,48 @@ async function initializePopup() {
       elements.currentUrl.textContent = 'N/A';
     }
   }
-  
+
   // Load data
   await loadCookies();
   await loadTrackers();
   updateStats();
-  
+
   // Check connection status
   await checkBackendConnection();
+}
+
+function updateLoginGate() {
+  const statsSection = document.querySelector('.stats-section');
+  const syncBanner = document.querySelector('.sync-banner');
+  const footer = document.querySelector('.footer');
+
+  if (!state.userEmail) {
+    // Hide data sections when not logged in
+    if (statsSection) statsSection.style.display = 'none';
+    if (syncBanner) syncBanner.style.display = 'none';
+    if (footer) footer.style.display = 'none';
+
+    // Show login prompt if it doesn't exist yet
+    if (!document.getElementById('loginGateMsg')) {
+      const msg = document.createElement('div');
+      msg.id = 'loginGateMsg';
+      msg.style.cssText = 'text-align:center;padding:32px 16px;color:var(--text-muted,#64748b);font-size:13px;';
+      msg.innerHTML = '<div style="font-size:28px;margin-bottom:12px;opacity:0.5;">🔒</div>' +
+        '<div style="font-weight:600;margin-bottom:4px;color:var(--text-primary,#e2e8f0);">Login Required</div>' +
+        '<div>Enter your email above to start tracking and viewing your privacy data.</div>';
+      const loginSection = document.getElementById('loginSection');
+      loginSection.insertAdjacentElement('afterend', msg);
+    }
+  } else {
+    // Show data sections when logged in
+    if (statsSection) statsSection.style.display = '';
+    if (syncBanner) syncBanner.style.display = '';
+    if (footer) footer.style.display = '';
+
+    // Remove login gate message
+    const gateMsg = document.getElementById('loginGateMsg');
+    if (gateMsg) gateMsg.remove();
+  }
 }
 
 // ============================================
@@ -231,26 +271,44 @@ function hideEmailInput() {
 
 async function saveEmail() {
   const email = elements.emailInput.value.trim();
-  
+
   if (!email) {
     state.userEmail = null;
     await chrome.storage.local.remove('userEmail');
   } else if (isValidEmail(email)) {
     state.userEmail = email;
     await chrome.storage.local.set({ userEmail: email });
-    
+
     // Notify background to re-sync with new email
-    chrome.runtime.sendMessage({ 
-      type: 'EMAIL_UPDATED', 
-      email: email 
+    chrome.runtime.sendMessage({
+      type: 'EMAIL_UPDATED',
+      email: email
     });
   } else {
     alert('Please enter a valid email address');
     return;
   }
-  
+
   updateEmailDisplay();
   hideEmailInput();
+  updateLoginGate();
+
+  // If user just logged in, load data now
+  if (state.userEmail) {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    state.currentTab = tab;
+    if (tab?.url) {
+      try {
+        elements.currentUrl.textContent = new URL(tab.url).hostname;
+      } catch {
+        elements.currentUrl.textContent = 'N/A';
+      }
+    }
+    await loadCookies();
+    await loadTrackers();
+    updateStats();
+    await checkBackendConnection();
+  }
 }
 
 function updateEmailDisplay() {

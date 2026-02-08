@@ -434,11 +434,12 @@ async def add_to_blocklist(request: BlocklistAddRequest):
 # ============================================
 
 @app.get("/api/overview", tags=["Dashboard API"])
-async def get_overview():
+async def get_overview(email: str = ""):
     """
     Get overview stats for the frontend dashboard.
     Returns total events, trackers, unique sites, daily time series, and categories.
     Includes 6 days of dummy historical data before real data begins.
+    Filters by user email if provided.
     """
     from datetime import datetime, timedelta
     import random
@@ -447,7 +448,7 @@ async def get_overview():
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        data = snowflake_db.get_overview_stats()
+        data = snowflake_db.get_overview_stats(email=email)
 
         total_trackers = data["totalTrackers"]
         total_cookies = 0  # cookies not accessible yet
@@ -492,10 +493,11 @@ async def get_overview():
 # ============================================
 
 @app.get("/api/trends", tags=["Dashboard API"])
-async def get_trends(days: int = 7):
+async def get_trends(days: int = 7, email: str = ""):
     """
     Get trends data for the Trends page.
     Returns daily tracker counts with dummy data for missing days.
+    Filters by user email if provided.
     """
     from datetime import datetime, timedelta
     import random
@@ -504,7 +506,7 @@ async def get_trends(days: int = 7):
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        data = snowflake_db.get_trends_data(days)
+        data = snowflake_db.get_trends_data(days, email=email)
 
         real_tracker_daily = {row["DATE"]: row["COUNT"] for row in data["trackerDaily"]}
 
@@ -535,16 +537,17 @@ async def get_trends(days: int = 7):
 # ============================================
 
 @app.get("/api/breakdown", tags=["Dashboard API"])
-async def get_breakdown():
+async def get_breakdown(email: str = ""):
     """
     Get breakdown stats for the Breakdown (Trackers) page.
     Returns top initiators, top domains, company groups, and all trackers.
+    Filters by user email if provided.
     """
     if not snowflake_db:
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        data = snowflake_db.get_breakdown_stats()
+        data = snowflake_db.get_breakdown_stats(email=email)
 
         top_by_initiator = [
             {"initiator": row["INITIATOR"], "count": row["COUNT"]}
@@ -709,16 +712,25 @@ def enrich_unknown_trackers():
 
         for tracker in unenriched:
             try:
-                result = tracker_identifier.identify(tracker['DOMAIN'])
+                # Create a tracker data dict for enrichment
+                tracker_data = {
+                    'domain': tracker['DOMAIN_NAME'],
+                    'url': tracker.get('FULL_URL', ''),
+                    'company': tracker.get('COMPANY', ''),
+                    'category': tracker.get('CATEGORY', ''),
+                }
 
-                if result.get('company') and result['company'] != 'Unknown':
+                # Enrich using the correct method name
+                enriched = tracker_identifier.enrich(tracker_data)
+
+                if enriched.get('company') and enriched['company'] not in ['Unknown', '']:
                     snowflake_db.update_enriched_tracker(
                         tracker['ID'],
-                        result['company'],
-                        result['category']
+                        enriched['company'],
+                        enriched['category']
                     )
             except Exception as e:
-                print(f"Error enriching tracker {tracker.get('DOMAIN')}: {e}")
+                print(f"Error enriching tracker {tracker.get('DOMAIN_NAME')}: {e}")
 
     except Exception as e:
         print(f"Error in enrichment task: {e}")

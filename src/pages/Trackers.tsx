@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import Panel from "../components/Panel.tsx"
+import { useUserEmail } from "../hooks/useUserEmail"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
@@ -35,18 +36,27 @@ type BreakdownData = {
 }
 
 export default function Trackers() {
+  const email = useUserEmail()
   const [activeTab, setActiveTab] = useState<SubTab>("trackers")
   const [search, setSearch] = useState("")
   const [data, setData] = useState<BreakdownData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/api/breakdown`)
+    if (!email) {
+      setLoading(false)
+      setData(null)
+      return
+    }
+
+    setLoading(true)
+    const params = new URLSearchParams({ email })
+    fetch(`${API_URL}/api/breakdown?${params}`)
       .then((res) => res.json())
       .then((d) => setData(d))
       .catch((err) => console.error("Failed to fetch breakdown:", err))
       .finally(() => setLoading(false))
-  }, [])
+  }, [email])
 
   const filteredTrackers = useMemo(() => {
     if (!data) return []

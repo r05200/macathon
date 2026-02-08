@@ -12,6 +12,7 @@ import {
 } from "recharts"
 import Panel from "../components/Panel.tsx"
 import KpiCard from "../components/KpiCard.tsx"
+import { useUserEmail } from "../hooks/useUserEmail"
 
 // ===== TYPES =====
 type OverviewStats = {
@@ -43,13 +44,24 @@ const CATEGORY_COLORS: Record<string, string> = {
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 export default function Overview() {
+  const email = useUserEmail()
   const [stats, setStats] = useState<OverviewStats | null>(null)
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([])
   const [categories, setCategories] = useState<CategoryPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/api/overview`)
+    if (!email) {
+      setLoading(false)
+      setStats(null)
+      setTimeSeries([])
+      setCategories([])
+      return
+    }
+
+    setLoading(true)
+    const params = new URLSearchParams({ email })
+    fetch(`${API_URL}/api/overview?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setStats({
@@ -65,7 +77,7 @@ export default function Overview() {
         console.error("Failed to fetch overview:", err)
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [email])
 
   if (loading || !stats) {
     return (

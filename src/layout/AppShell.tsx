@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import NavItem from "../components/NavItem";
 import CyberTitle from "../components/CyberTitle";
+import { useUserEmail } from "../hooks/useUserEmail";
 
 const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
 
@@ -21,6 +22,7 @@ export default function AppShell() {
   const location = useLocation();
   const title = PAGE_TITLES[location.pathname] ?? "Privacy Shield";
   const { logout } = authDisabled ? { logout: () => {} } : useAuth0();
+  const email = useUserEmail();
 
   return (
     <div className="min-h-screen bg-[var(--cyber-bg)] flex">
@@ -52,6 +54,11 @@ export default function AppShell() {
             className="text-lg font-bold text-[var(--cyber-text)]"
           />
           <div className="flex items-center gap-3">
+            {email && (
+              <span className="text-xs text-[var(--cyber-text-muted)] font-mono">
+                {email}
+              </span>
+            )}
             {!authDisabled && (
               <button
                 onClick={() =>
