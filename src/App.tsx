@@ -4,7 +4,6 @@ import Overview from "./pages/Overview";
 import Trackers from "./pages/Trackers";
 import Companies from "./pages/Companies";
 import Trends from "./pages/Trends";
-import Geography from "./pages/Geography";
 import Settings from "./pages/Settings";
 
 import { useAuth0 } from "@auth0/auth0-react";
@@ -13,23 +12,68 @@ import { useEffect } from "react";
 
 const authDisabled = import.meta.env.VITE_AUTH_DISABLED === 'true';
 
-// (previously used HOC) AppShellProtected removed — using ProtectedRoute instead
-
-// Landing page component that handles auth flow
 function Landing() {
-  const { loginWithRedirect, isAuthenticated, isLoading } = useAuth0();
   const location = useLocation();
 
-  // Detect OAuth callback in URL (Auth0 returns ?code=...&state=...)
+  if (authDisabled) {
+    return <Navigate to="/app/overview" replace />;
+  }
+
+  const { isAuthenticated, isLoading, loginWithRedirect, error } = useAuth0();
+
+  console.log('[Landing] State:', {
+    isAuthenticated,
+    isLoading,
+    error,
+    location: location.pathname + location.search
+  });
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      console.log("[Landing] User authenticated, redirecting to app");
+    }
+  }, [isLoading, isAuthenticated]);
+
   const isCallback = !!(location.search.includes("code=") && location.search.includes("state="));
 
-  // Auto-trigger interactive login on app load when auth is enabled
-  // but avoid doing so while SDK is processing a callback or while loading.
+  console.log('[Landing] isCallback:', isCallback, 'search:', location.search);
+
   useEffect(() => {
-    if (!authDisabled && !isLoading && !isAuthenticated && !isCallback) {
-      loginWithRedirect({ appState: { returnTo: "/app/overview" } });
+    console.log('[Landing] Login effect:', { isLoading, isAuthenticated, isCallback });
+    if (!isLoading && !isAuthenticated && !isCallback) {
+      console.log('[Landing] Triggering loginWithRedirect');
+      loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })
+        .catch(err => console.error('[Landing] Login error:', err));
     }
-  }, [authDisabled, isLoading, isAuthenticated, isCallback, loginWithRedirect]);
+  }, [isLoading, isAuthenticated, isCallback, loginWithRedirect, location.pathname, location.search]);
+
+  if (error) {
+    console.error('[Landing] Auth0 Error:', error);
+    
+    // If it's an invalid state error, clear storage and retry
+    if (error.message.includes('Invalid state')) {
+      console.log('[Landing] Invalid state detected, clearing auth storage and retrying...');
+      localStorage.removeItem(`@@auth0spajs@@::${import.meta.env.VITE_AUTH0_CLIENT_ID}::${import.meta.env.VITE_AUTH0_DOMAIN}::openid profile email`);
+      localStorage.removeItem('a0.spajs.txs');
+      window.location.href = '/';
+      return null;
+    }
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-600">
+        <div className="p-6 bg-white rounded shadow text-center">
+          <h2 className="text-lg font-semibold text-red-600">Authentication Error</h2>
+          <p className="mt-2">{error.message}</p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading || isCallback) {
     return (
@@ -43,59 +87,10 @@ function Landing() {
     return <Navigate to="/app/overview" replace />;
   }
 
-  // If auth is disabled, show login button UI (or let developer disable auth for local work)
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">Tracker Dashboard</h1>
-        <p className="mt-2 text-sm text-gray-600">Sign in to view your tracker analytics.</p>
-        <button
-          onClick={() => loginWithRedirect({ appState: { returnTo: "/app/overview" } })}
-          className="mt-5 w-full rounded-lg bg-black px-4 py-2 text-white hover:opacity-90"
-        >
-          Log in
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Callback component for Auth0 redirect
-function Callback() {
-  const { isLoading, isAuthenticated, error } = useAuth0();
-
-  useEffect(() => {
-    console.log("Callback: isLoading=", isLoading, "isAuthenticated=", isAuthenticated, "error=", error);
-  }, [isLoading, isAuthenticated, error]);
-
-  if (error) {
-    console.error("Auth0 callback error:", error);
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md bg-red-50 border border-red-300 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Authentication Error</h2>
-          <p className="text-sm text-red-700">{error.message}</p>
-          <button
-            onClick={() => window.location.href = "/"}
-            className="mt-4 w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Back to Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    console.log("✅ Authentication successful, redirecting to /app/overview");
-    return <Navigate to="/app/overview" replace />;
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center text-gray-600">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-        <p>Completing authentication…</p>
+      <div className="p-6 bg-white rounded shadow text-center">
+        <h2 className="text-lg font-semibold">Redirecting to sign in…</h2>
       </div>
     </div>
   );
@@ -107,7 +102,6 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/callback" element={<Callback />} />
 
-      {/* Protect everything under /app */}
       <Route
         path="/app"
         element={
@@ -125,7 +119,6 @@ export default function App() {
         <Route path="trackers" element={<Trackers />} />
         <Route path="companies" element={<Companies />} />
         <Route path="trends" element={<Trends />} />
-        <Route path="geography" element={<Geography />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

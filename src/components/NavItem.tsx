@@ -10,10 +10,10 @@ export default function NavItem({ to, label }: NavItemProps) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+        `block px-3 py-2 rounded-md text-sm font-medium tracking-wide transition-all duration-200 ${
           isActive
-            ? "bg-blue-50 text-blue-600"
-            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            ? "bg-[var(--cyber-accent)]/10 text-[var(--cyber-accent)] border-l-2 border-[var(--cyber-accent)]"
+            : "text-[var(--cyber-text-muted)] hover:text-[var(--cyber-text)] hover:bg-white/5"
         }`
       }
     >

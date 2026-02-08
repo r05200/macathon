@@ -5,16 +5,20 @@ import { useAuth0 } from "@auth0/auth0-react";
 
 type Props = { children: ReactNode };
 
+const authDisabled = import.meta.env.VITE_AUTH_DISABLED === 'true';
+
 export default function ProtectedRoute({ children }: Props) {
+  if (authDisabled) {
+    return <>{children}</>;
+  }
+
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
   const location = useLocation();
 
-  // Detect OAuth callback in URL (Auth0 returns ?code=...&state=...)
   const isCallback = !!(location.search.includes("code=") && location.search.includes("state="));
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isCallback) {
-      // Trigger interactive login once when we know user is not authenticated
       loginWithRedirect({ appState: { returnTo: location.pathname + location.search } });
     }
   }, [isLoading, isAuthenticated, isCallback, loginWithRedirect, location.pathname, location.search]);
@@ -29,6 +33,5 @@ export default function ProtectedRoute({ children }: Props) {
 
   if (isAuthenticated) return <>{children}</>;
 
-  // While loginWithRedirect is starting, render nothing (useEffect will redirect)
   return null;
 }

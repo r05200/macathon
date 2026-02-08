@@ -7,8 +7,16 @@ import App from "./App";
 
 const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
 
+console.log('[Auth] Config:', {
+  authDisabled,
+  domain: import.meta.env.VITE_AUTH0_DOMAIN,
+  clientId: import.meta.env.VITE_AUTH0_CLIENT_ID,
+  redirectUri: window.location.origin,
+  currentUrl: window.location.href
+});
+
 const Root = (
-  <StrictMode>
+  <>
     {authDisabled ? (
       <BrowserRouter>
         <App />
@@ -18,18 +26,21 @@ const Root = (
         domain={import.meta.env.VITE_AUTH0_DOMAIN}
         clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
         authorizationParams={{
-          redirect_uri: `${window.location.origin}/callback`,
+          redirect_uri: window.location.origin,
           scope: "openid profile email"
         }}
-        useRefreshTokens={true}
         cacheLocation="localstorage"
+        useRefreshTokens={true}
+        onRedirectCallback={(appState) => {
+          console.log('[Auth] Redirect callback:', appState);
+        }}
       >
         <BrowserRouter>
           <App />
         </BrowserRouter>
       </Auth0Provider>
     )}
-  </StrictMode>
+  </>
 );
 
 createRoot(document.getElementById("root")!).render(Root);
