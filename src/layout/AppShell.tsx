@@ -1,10 +1,10 @@
-import { Outlet, useLocation } from "react-router-dom"
-import { useAuth0 } from "@auth0/auth0-react"
-import NavItem from "../components/NavItem"
-import Badge from "../components/Badge"
-import CyberTitle from "../components/CyberTitle"
+import { Outlet, useLocation } from "react-router-dom";
+import { useAuth0 } from "@auth0/auth0-react";
+import NavItem from "../components/NavItem";
+import Badge from "../components/Badge";
+import CyberTitle from "../components/CyberTitle";
 
-const authDisabled = import.meta.env.VITE_AUTH_DISABLED === 'true'
+const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
 
 const NAV_ITEMS = [
   { path: "/app/overview", label: "Overview" },
@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { path: "/app/companies", label: "Companies" },
   { path: "/app/trends", label: "Trends" },
   { path: "/app/settings", label: "Settings" },
-]
+];
 
 const PAGE_TITLES: Record<string, string> = {
   "/app/overview": "Overview",
@@ -20,12 +20,12 @@ const PAGE_TITLES: Record<string, string> = {
   "/app/companies": "Companies",
   "/app/trends": "Trends",
   "/app/settings": "Settings",
-}
+};
 
 export default function AppShell() {
-  const location = useLocation()
-  const title = PAGE_TITLES[location.pathname] ?? "Privacy Shield"
-  const { logout } = authDisabled ? { logout: () => {} } : useAuth0()
+  const location = useLocation();
+  const title = PAGE_TITLES[location.pathname] ?? "Privacy Shield";
+  const { logout } = authDisabled ? { logout: () => {} } : useAuth0();
 
   return (
     <div className="min-h-screen bg-[var(--cyber-bg)] flex">
@@ -37,7 +37,9 @@ export default function AppShell() {
               Privacy Shield
             </h2>
           </div>
-          <p className="text-[10px] text-[var(--cyber-text-muted)] mt-1 tracking-wider">TRACKER MONITOR v0.2</p>
+          <p className="text-[10px] text-[var(--cyber-text-muted)] mt-1 tracking-wider">
+            TRACKER MONITOR v0.2
+          </p>
         </div>
         <nav className="px-2 py-3 space-y-1">
           {NAV_ITEMS.map((item) => (
@@ -58,7 +60,9 @@ export default function AppShell() {
             <Badge>Mock data</Badge>
             {!authDisabled && (
               <button
-                onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+                onClick={() =>
+                  logout({ logoutParams: { returnTo: window.location.origin } })
+                }
                 className="px-3 py-1.5 text-xs font-medium tracking-wide text-[var(--cyber-text-muted)] hover:text-[var(--cyber-text)] border border-[var(--cyber-border)] hover:border-[var(--cyber-accent)]/30 rounded-md transition-colors"
               >
                 Log out
@@ -74,5 +78,5 @@ export default function AppShell() {
         </div>
       </main>
     </div>
-  )
+  );
 }
