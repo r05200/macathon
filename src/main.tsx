@@ -1,13 +1,30 @@
-import { StrictMode } from "react"
-import { createRoot } from "react-dom/client"
-import { BrowserRouter } from "react-router-dom"
-import App from "./App"
-import "./index.css"
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import { Auth0Provider } from "@auth0/auth0-react";
+import "./index.css";
+import App from "./App";
 
-createRoot(document.getElementById("root")!).render(
+const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
+
+const Root = (
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </StrictMode>,
-)
+    {authDisabled ? (
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    ) : (
+      <Auth0Provider
+        domain={import.meta.env.VITE_AUTH0_DOMAIN}
+        clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
+        authorizationParams={{ redirect_uri: window.location.origin }}
+      >
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </Auth0Provider>
+    )}
+  </StrictMode>
+);
+
+createRoot(document.getElementById("root")!).render(Root);
