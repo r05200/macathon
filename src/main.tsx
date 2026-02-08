@@ -1,4 +1,3 @@
-import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Auth0Provider } from "@auth0/auth0-react";
@@ -7,12 +6,12 @@ import App from "./App";
 
 const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
 
-console.log('[Auth] Config:', {
+console.log("[Auth] Config:", {
   authDisabled,
   domain: import.meta.env.VITE_AUTH0_DOMAIN,
   clientId: import.meta.env.VITE_AUTH0_CLIENT_ID,
   redirectUri: window.location.origin,
-  currentUrl: window.location.href
+  currentUrl: window.location.href,
 });
 
 const Root = (
@@ -27,12 +26,12 @@ const Root = (
         clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
         authorizationParams={{
           redirect_uri: window.location.origin,
-          scope: "openid profile email"
+          scope: "openid profile email",
         }}
         cacheLocation="localstorage"
         useRefreshTokens={true}
         onRedirectCallback={(appState) => {
-          console.log('[Auth] Redirect callback:', appState);
+          console.log("[Auth] Redirect callback:", appState);
         }}
       >
         <BrowserRouter>
