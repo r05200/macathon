@@ -535,6 +535,63 @@ class SnowflakeDB:
             conn.close()
 
     # ============================================
+    # SECURITY REPORT OPERATIONS
+    # ============================================
+
+    def get_security_report_data(self, email: str, start_date: str) -> Dict:
+        """
+        Get all tracker data from start_date to present for security analysis.
+        Returns per-domain aggregated stats for Gemini to analyze.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor(snowflake.connector.DictCursor)
+
+        try:
+            # Per-domain stats
+            cursor.execute("""
+                SELECT
+                    DOMAIN_NAME,
+                    COALESCE(NULLIF(COMPANY, ''), 'Unknown') as COMPANY,
+                    COALESCE(NULLIF(CATEGORY, ''), 'unknown') as CATEGORY,
+                    SUM(OCCURRENCES) as TOTAL_HITS,
+                    COUNT(DISTINCT INITIATOR) as UNIQUE_INITIATORS,
+                    COUNT(*) as ENTRY_COUNT
+                FROM URL_DATA
+                WHERE EMAIL_ID = %s
+                  AND CREATED_AT >= %s
+                GROUP BY DOMAIN_NAME, COALESCE(NULLIF(COMPANY, ''), 'Unknown'), COALESCE(NULLIF(CATEGORY, ''), 'unknown')
+                ORDER BY TOTAL_HITS DESC
+            """, (email, start_date))
+            domain_stats = [dict(row) for row in cursor.fetchall()]
+
+            # Total tracker count
+            cursor.execute("""
+                SELECT COUNT(*) as TOTAL
+                FROM URL_DATA
+                WHERE EMAIL_ID = %s AND CREATED_AT >= %s
+            """, (email, start_date))
+            total = cursor.fetchone()['TOTAL']
+
+            # Unique initiators (sites visited)
+            cursor.execute("""
+                SELECT COUNT(DISTINCT INITIATOR) as TOTAL
+                FROM URL_DATA
+                WHERE EMAIL_ID = %s AND CREATED_AT >= %s
+                  AND INITIATOR IS NOT NULL AND INITIATOR != ''
+            """, (email, start_date))
+            unique_sites = cursor.fetchone()['TOTAL']
+
+            return {
+                "domainStats": domain_stats,
+                "totalTrackers": total,
+                "uniqueSites": unique_sites
+            }
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    # ============================================
     # ENRICHMENT OPERATIONS
     # ============================================
 

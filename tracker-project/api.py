@@ -696,6 +696,116 @@ async def get_tracker_history(email: str, limit: int = 500):
 
 
 # ============================================
+# SECURITY REPORT API ENDPOINT
+# ============================================
+
+@app.get("/api/security-report", tags=["Dashboard API"])
+async def get_security_report(email: str, start_date: str = ""):
+    """
+    Generate a security report using Gemini AI.
+    Analyzes all tracker data from start_date to present for the given user.
+    Returns overall score, summary, top 3 least secure sites, and per-domain scores.
+    """
+    import os
+    import json
+
+    if not snowflake_db:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    if not start_date:
+        from datetime import datetime, timedelta
+        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    try:
+        # Get tracker data from Snowflake
+        report_data = snowflake_db.get_security_report_data(email, start_date)
+
+        if not report_data["domainStats"]:
+            return {
+                "overallScore": 100,
+                "summary": "No tracking data found for this period. Your browsing appears clean!",
+                "top3Least": [],
+                "domainScores": []
+            }
+
+        # Build prompt for Gemini
+        domain_summary = []
+        for d in report_data["domainStats"]:
+            domain_summary.append(
+                f"- {d['DOMAIN_NAME']} (company: {d['COMPANY']}, category: {d['CATEGORY']}, "
+                f"hits: {d['TOTAL_HITS']}, seen on {d['UNIQUE_INITIATORS']} different sites)"
+            )
+        domain_text = "\n".join(domain_summary[:50])  # Limit to top 50
+
+        prompt = f"""You are a cybersecurity analyst evaluating a user's web browsing privacy and security.
+
+Here is the tracking data detected on this user's browser from {start_date} to today:
+
+Total tracker requests: {report_data['totalTrackers']}
+Unique websites visited: {report_data['uniqueSites']}
+Tracker domains detected:
+{domain_text}
+
+Analyze this data and respond with ONLY a valid JSON object (no markdown, no code fences) in this exact format:
+{{
+  "overallScore": <number 0-100, where 100 is most secure>,
+  "summary": "<2-3 sentence analysis of the user's security posture>",
+  "domainScores": [
+    {{"domain": "<tracker domain>", "score": <0-100>, "reason": "<brief reason>"}},
+    ...
+  ]
+}}
+
+Rules for scoring:
+- Advertising/tracking domains get lower scores (more privacy risk)
+- Analytics domains get moderate scores
+- Social media trackers get low-moderate scores
+- Domains with very high hit counts get lower scores (more pervasive tracking)
+- Domains seen across many different sites get lower scores
+- The overall score should reflect the aggregate privacy risk
+- Include ALL tracker domains from the data in domainScores
+- Sort domainScores by score ascending (least secure first)"""
+
+        # Call Gemini API
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        if not gemini_key:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured in .env")
+
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-flash-lite-latest")
+        response = model.generate_content(prompt)
+
+        # Parse the JSON response
+        response_text = response.text.strip()
+        # Remove markdown code fences if present
+        if response_text.startswith("```"):
+            response_text = response_text.split("\n", 1)[1]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3].strip()
+
+        result = json.loads(response_text)
+
+        # Extract top 3 least secure
+        all_scores = result.get("domainScores", [])
+        top3 = all_scores[:3] if len(all_scores) >= 3 else all_scores
+
+        return {
+            "overallScore": result.get("overallScore", 50),
+            "summary": result.get("summary", "Analysis complete."),
+            "top3Least": top3,
+            "domainScores": all_scores
+        }
+
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse Gemini response: {e}")
+        print(f"Raw response: {response_text}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating security report: {str(e)}")
+
+
+# ============================================
 # ENRICHMENT HELPER
 # ============================================
 
