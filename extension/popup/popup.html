@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=400, height=600">
+  <meta name="viewport" content="width=350, height=380">
   <title>Privacy Shield</title>
   <link rel="stylesheet" href="popup.css">
 </head>
@@ -73,101 +73,6 @@
         </div>
       </div>
     </section>
-
-    <!-- Tab Navigation -->
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="cookies">🍪 Cookies</button>
-      <button class="tab-btn" data-tab="trackers">🔍 Trackers</button>
-      <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
-    </nav>
-
-    <!-- Tab Content -->
-    <div class="tab-content">
-      
-      <!-- Cookies Tab -->
-      <div class="tab-pane active" id="cookiesTab">
-        <div class="tab-toolbar">
-          <input type="text" id="cookieSearch" placeholder="Search cookies..." class="search-input">
-          <select id="cookieFilter" class="filter-select">
-            <option value="all">All</option>
-            <option value="third-party">Third-party</option>
-            <option value="tracking">Tracking</option>
-            <option value="persistent">Persistent</option>
-            <option value="session">Session</option>
-          </select>
-        </div>
-        <div class="list-container" id="cookieList">
-          <div class="loading">Loading cookies...</div>
-        </div>
-      </div>
-
-      <!-- Trackers Tab -->
-      <div class="tab-pane" id="trackersTab">
-        <div class="tab-toolbar">
-          <input type="text" id="trackerSearch" placeholder="Search trackers..." class="search-input">
-        </div>
-        <div class="tracker-legend">
-          <span class="legend-item"><span class="legend-dot blocked"></span> Blocked (3rd party)</span>
-          <span class="legend-item"><span class="legend-dot active"></span> Active</span>
-        </div>
-        <div class="list-container" id="trackerList">
-          <div class="empty-state">
-            <span class="empty-icon">🔍</span>
-            <p>Navigate to a page to detect trackers</p>
-          </div>
-        </div>
-        <div class="manage-hint">
-          <span>💡</span>
-          <span>Manage your blocklist on the <a href="#" id="openDashboard">Privacy Shield Dashboard</a></span>
-        </div>
-      </div>
-
-      <!-- Settings Tab -->
-      <div class="tab-pane" id="settingsTab">
-        <div class="settings-list">
-          <div class="setting-item">
-            <div class="setting-info">
-              <span class="setting-label">Backend API URL</span>
-              <span class="setting-desc">Where to sync blocklist from</span>
-            </div>
-            <input type="text" id="apiUrlInput" class="setting-input" placeholder="https://your-api.com">
-          </div>
-          
-          <div class="setting-item">
-            <div class="setting-info">
-              <span class="setting-label">Auto-sync Interval</span>
-              <span class="setting-desc">How often to fetch blocklist updates</span>
-            </div>
-            <select id="syncIntervalSelect" class="filter-select">
-              <option value="5">Every 5 minutes</option>
-              <option value="15">Every 15 minutes</option>
-              <option value="30">Every 30 minutes</option>
-              <option value="60">Every hour</option>
-            </select>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <span class="setting-label">Blocking Mode</span>
-              <span class="setting-desc">Only blocks trackers when loaded as 3rd party</span>
-            </div>
-            <span class="badge badge-functional">3rd Party Only</span>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <span class="setting-label">Device ID</span>
-              <span class="setting-desc">Identifies this browser instance</span>
-            </div>
-            <code class="device-id" id="deviceIdDisplay">Loading...</code>
-          </div>
-
-          <button class="btn btn-secondary full-width" id="saveSettingsBtn">Save Settings</button>
-          <button class="btn btn-link full-width" id="clearDataBtn">Clear All Local Data</button>
-        </div>
-      </div>
-
-    </div>
 
     <!-- Footer -->
     <footer class="footer">
