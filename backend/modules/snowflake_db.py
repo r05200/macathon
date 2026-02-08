@@ -107,3 +107,25 @@ LIMIT 6
         "week_over_week_change": run_query(query3),
         "monthly_privacy_stats": run_query(query4),
     }
+
+
+def cookie_info():
+    """Extract all cookie data with every category/field from COOKIES_DATA."""
+    query = """
+SELECT
+    ID,
+    COOKIE_NAME,
+    DOMAIN_NAME,
+    COMPANY,
+    CATEGORY,
+    IS_TRACKER,
+    IS_THIRD_PARTY,
+    IS_PERSISTENT,
+    EXPIRATION_DATE,
+    PAGE_URL,
+    USER_EMAIL,
+    DETECTED_AT
+FROM COOKIES_DB.COOKIE_DATA.COOKIES_DATA
+ORDER BY DETECTED_AT DESC
+"""
+    return run_query(query)

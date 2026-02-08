@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Shield - API Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input[type="email"] {
+            padding: 10px;
+            width: 300px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        pre {
+            background: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .output {
+            margin-top: 15px;
+            color: #333;
+        }
+        .error {
+            color: #c33;
+            background: #fee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            color: #3c3;
+            background: #efe;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Privacy Shield - API Integration Example</h1>
+    <p>This page demonstrates how to use the <code>api-client.js</code> module to fetch data from Snowflake through the FastAPI backend.</p>
+
+    <!-- Email Input -->
+    <div class="section">
+        <h2>Enter Your Email</h2>
+        <input type="email" id="emailInput" placeholder="user@example.com" value="">
+        <p style="color: #666; font-size: 14px; margin-top: 10px;">
+            This should match the email used in your Privacy Shield browser extension.
+        </p>
+    </div>
+
+    <!-- Health Check -->
+    <div class="section">
+        <h2>1. Check API Health</h2>
+        <button onclick="testHealth()">Check Health</button>
+        <div id="healthOutput" class="output"></div>
+    </div>
+
+    <!-- Get Cookies -->
+    <div class="section">
+        <h2>2. Fetch Cookies from Snowflake</h2>
+        <button onclick="testGetCookies()">Get Cookies</button>
+        <div id="cookiesOutput" class="output"></div>
+    </div>
+
+    <!-- Get Trackers -->
+    <div class="section">
+        <h2>3. Fetch Trackers from Snowflake</h2>
+        <button onclick="testGetTrackers()">Get Trackers</button>
+        <div id="trackersOutput" class="output"></div>
+    </div>
+
+    <!-- Get Blocklist -->
+    <div class="section">
+        <h2>4. Fetch Blocklist from Snowflake</h2>
+        <button onclick="testGetBlocklist()">Get Blocklist</button>
+        <div id="blocklistOutput" class="output"></div>
+    </div>
+
+    <!-- Database Stats -->
+    <div class="section">
+        <h2>5. Get DuckDuckGo Database Stats</h2>
+        <button onclick="testDatabaseStats()">Get Stats</button>
+        <div id="statsOutput" class="output"></div>
+    </div>
+
+    <script type="module">
+        // Import all functions from api-client.js
+        import {
+            checkHealth,
+            getCookies,
+            getTrackers,
+            getBlocklist,
+            getDatabaseStats,
+            identifyDomain,
+            addToBlocklist
+        } from './api-client.js';
+
+        // Make functions available globally so onclick handlers can access them
+        window.testHealth = async function() {
+            const output = document.getElementById('healthOutput');
+            output.innerHTML = '<p>Loading...</p>';
+
+            try {
+                const result = await checkHealth();
+                output.innerHTML = `
+                    <div class="success">
+                        <strong>Status:</strong> ${result.status}<br>
+                        <strong>Database:</strong> ${result.database}
+                    </div>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+                console.log('Health check:', result);
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Health check failed:', error);
+            }
+        };
+
+        window.testGetCookies = async function() {
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email) {
+                alert('Please enter your email address');
+                return;
+            }
+
+            const output = document.getElementById('cookiesOutput');
+            output.innerHTML = '<p>Fetching cookies from Snowflake...</p>';
+
+            try {
+                const result = await getCookies(email, 50);
+
+                output.innerHTML = `
+                    <div class="success">
+                        <strong>Total Cookies:</strong> ${result.stats.TOTAL_COOKIES || 0}<br>
+                        <strong>Trackers:</strong> ${result.stats.TRACKER_COUNT || 0}<br>
+                        <strong>Third-Party:</strong> ${result.stats.THIRD_PARTY_COUNT || 0}<br>
+                        <strong>Persistent:</strong> ${result.stats.PERSISTENT_COUNT || 0}
+                    </div>
+                    <p><strong>First 5 cookies:</strong></p>
+                    <pre>${JSON.stringify(result.cookies.slice(0, 5), null, 2)}</pre>
+                `;
+                console.log('Cookies data:', result);
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Get cookies failed:', error);
+            }
+        };
+
+        window.testGetTrackers = async function() {
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email) {
+                alert('Please enter your email address');
+                return;
+            }
+
+            const output = document.getElementById('trackersOutput');
+            output.innerHTML = '<p>Fetching trackers from Snowflake...</p>';
+
+            try {
+                const result = await getTrackers(email, 50);
+
+                output.innerHTML = `
+                    <div class="success">
+                        <strong>Total Trackers:</strong> ${result.trackers.length}<br>
+                        <strong>Top Companies:</strong> ${result.stats.slice(0, 3).map(s => s.COMPANY).join(', ')}
+                    </div>
+                    <p><strong>First 5 trackers:</strong></p>
+                    <pre>${JSON.stringify(result.trackers.slice(0, 5), null, 2)}</pre>
+                    <p><strong>Stats by company:</strong></p>
+                    <pre>${JSON.stringify(result.stats.slice(0, 10), null, 2)}</pre>
+                `;
+                console.log('Trackers data:', result);
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Get trackers failed:', error);
+            }
+        };
+
+        window.testGetBlocklist = async function() {
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email) {
+                alert('Please enter your email address');
+                return;
+            }
+
+            const output = document.getElementById('blocklistOutput');
+            output.innerHTML = '<p>Fetching blocklist from Snowflake...</p>';
+
+            try {
+                const blocklist = await getBlocklist(email);
+
+                output.innerHTML = `
+                    <div class="success">
+                        <strong>Blocked Domains:</strong> ${blocklist.length}
+                    </div>
+                    <pre>${JSON.stringify(blocklist, null, 2)}</pre>
+                `;
+                console.log('Blocklist:', blocklist);
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Get blocklist failed:', error);
+            }
+        };
+
+        window.testDatabaseStats = async function() {
+            const output = document.getElementById('statsOutput');
+            output.innerHTML = '<p>Fetching DuckDuckGo tracker database stats...</p>';
+
+            try {
+                const stats = await getDatabaseStats();
+
+                output.innerHTML = `
+                    <div class="success">
+                        <strong>Total Trackers:</strong> ${stats.total_trackers}<br>
+                        <strong>Total Companies:</strong> ${stats.total_companies}<br>
+                        <strong>Categories:</strong> ${stats.categories.length}
+                    </div>
+                    <pre>${JSON.stringify(stats, null, 2)}</pre>
+                `;
+                console.log('Database stats:', stats);
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Get stats failed:', error);
+            }
+        };
+
+        // Auto-run health check on page load
+        window.addEventListener('load', () => {
+            console.log('Privacy Shield API Client loaded');
+            console.log('Open DevTools Console to see API responses');
+            testHealth();
+        });
+    </script>
+
+    <div class="section">
+        <h2>How to Use This Example</h2>
+        <ol>
+            <li>Make sure your FastAPI server is running: <code>cd tracker-project && uvicorn api:app --reload</code></li>
+            <li>Enter your email address (the one you use in the browser extension)</li>
+            <li>Click each button to test the API endpoints</li>
+            <li>Open browser DevTools Console (F12) to see detailed responses</li>
+            <li>Check Network tab to see the HTTP requests to <code>http://localhost:8000</code></li>
+        </ol>
+
+        <h3>Next Steps</h3>
+        <ul>
+            <li>Import <code>api-client.js</code> into your own HTML/React/Vue app</li>
+            <li>Build a custom dashboard with charts and visualizations</li>
+            <li>Add real-time updates using polling or WebSockets</li>
+            <li>Create user authentication and personalized views</li>
+        </ul>
+
+        <h3>Code Example</h3>
+        <pre>// In your own JavaScript file:
+import { getCookies, getTrackers } from './api-client.js';
+
+async function loadDashboard(userEmail) {
+  const cookieData = await getCookies(userEmail, 100);
+  const trackerData = await getTrackers(userEmail, 100);
+
+  // Display data in your UI
+  console.log(cookieData.stats);
+  console.log(trackerData.stats);
+}</pre>
+    </div>
+
+    <div class="section" style="background: #f8f8f8;">
+        <h3>Troubleshooting</h3>
+        <ul>
+            <li><strong>API not responding?</strong> Make sure the FastAPI server is running on port 8000</li>
+            <li><strong>No data returned?</strong> Check if cookies/trackers exist for your email in Snowflake</li>
+            <li><strong>Database disconnected?</strong> Verify your <code>.env</code> file has correct Snowflake credentials</li>
+            <li><strong>CORS errors?</strong> The API should have CORS enabled, but make sure you're not using <code>file://</code> protocol</li>
+        </ul>
+        <p>
+            For detailed connection verification, see: <a href="../tracker-project/SNOWFLAKE_SETUP.md">SNOWFLAKE_SETUP.md</a>
+        </p>
+    </div>
+</body>
+</html>
