@@ -60,10 +60,12 @@ class SnowflakeDB:
         if not cookies:
             return 0
 
+        print(f"📝 Inserting {len(cookies)} cookies for user {user_email}")
         conn = self._get_connection()
         cursor = conn.cursor()
 
         try:
+            inserted = 0
             for cookie in cookies:
                 # Parse expiration date
                 exp_date = None
@@ -100,13 +102,15 @@ class SnowflakeDB:
                     device_id[:100],
                     cookie.get('pageUrl', '')[:1000]
                 ))
+                inserted += 1
 
             conn.commit()
-            return len(cookies)
+            print(f"✅ Successfully inserted {inserted} cookies into Snowflake")
+            return inserted
 
         except Exception as e:
             conn.rollback()
-            print(f"Error inserting cookies: {e}")
+            print(f"❌ Error inserting cookies: {e}")
             raise
         finally:
             cursor.close()
@@ -203,10 +207,12 @@ class SnowflakeDB:
         if not trackers:
             return 0
 
+        print(f"📝 Inserting {len(trackers)} trackers for user {user_email}")
         conn = self._get_connection()
         cursor = conn.cursor()
 
         try:
+            inserted = 0
             for tracker in trackers:
                 # Parse timestamps
                 first_seen = None
@@ -248,13 +254,15 @@ class SnowflakeDB:
                     first_seen,
                     last_seen
                 ))
+                inserted += 1
 
             conn.commit()
-            return len(trackers)
+            print(f"✅ Successfully inserted {inserted} trackers into Snowflake")
+            return inserted
 
         except Exception as e:
             conn.rollback()
-            print(f"Error inserting trackers: {e}")
+            print(f"❌ Error inserting trackers: {e}")
             raise
         finally:
             cursor.close()

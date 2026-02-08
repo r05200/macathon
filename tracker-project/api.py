@@ -70,6 +70,33 @@ class TrackerResponse(BaseModel):
     is_tracker: bool
 
 
+class TrackerData(BaseModel):
+    """Model for tracker data from extension"""
+    domain: str = Field(..., description="Tracker domain")
+    fullUrl: str = Field(default="", description="Full URL of the tracker")
+    type: str = Field(default="", description="Request type (script, image, etc)")
+    initiator: str = Field(default="", description="Site that initiated the request")
+    company: str = Field(default="", description="Company that owns the tracker")
+    category: str = Field(default="", description="Category (advertising, analytics, etc)")
+    isBlocked: bool = Field(default=False, description="Whether tracker was blocked")
+    timestamp: str = Field(default="", description="When tracker was detected")
+
+
+class CookieData(BaseModel):
+    """Model for cookie data from extension"""
+    name: str = Field(..., description="Cookie name")
+    domain: str = Field(..., description="Cookie domain")
+    value: str = Field(default="", description="Cookie value")
+    company: str = Field(default="", description="Company that set the cookie")
+    category: str = Field(default="", description="Cookie category")
+    httpOnly: bool = Field(default=False, description="HttpOnly flag")
+    secure: bool = Field(default=False, description="Secure flag")
+    sameSite: str = Field(default="", description="SameSite attribute")
+    expiration: str = Field(default="", description="Expiration date")
+    isThirdParty: bool = Field(default=False, description="Is third-party cookie")
+    timestamp: str = Field(default="", description="When cookie was detected")
+
+
 class UploadRequest(BaseModel):
     """Request model for uploading tracker/cookie data from extension"""
     email: str = Field(..., description="User email address")
@@ -238,20 +265,55 @@ async def upload_tracker_data(request: UploadRequest):
         {
             "email": "user@example.com",
             "deviceId": "abc-123",
-            "trackers": [...],
-            "cookies": [...],
+            "trackers": [
+                {
+                    "domain": "doubleclick.net",
+                    "fullUrl": "https://doubleclick.net/track",
+                    "type": "script",
+                    "initiator": "example.com",
+                    "company": "Google",
+                    "category": "advertising",
+                    "isBlocked": true,
+                    "timestamp": "2024-01-01T12:00:00Z"
+                }
+            ],
+            "cookies": [
+                {
+                    "name": "_ga",
+                    "domain": "google-analytics.com",
+                    "value": "GA1.2.xxx",
+                    "company": "Google",
+                    "category": "analytics",
+                    "httpOnly": false,
+                    "secure": true,
+                    "sameSite": "lax",
+                    "expiration": "2025-01-01T00:00:00Z",
+                    "isThirdParty": true,
+                    "timestamp": "2024-01-01T12:00:00Z"
+                }
+            ],
             "timestamp": "2024-01-01T12:00:00Z"
         }
 
         Response:
         {
             "success": true,
-            "cookies_inserted": 10,
-            "trackers_inserted": 5
+            "cookies_inserted": 1,
+            "trackers_inserted": 1
         }
     """
     if not snowflake_db:
-        raise HTTPException(status_code=503, detail="Database not available")
+        # If database is not available, still accept the data but log warning
+        print("⚠️  Database not available, data not persisted")
+        return {
+            "success": False,
+            "message": "Database not available",
+            "cookies_inserted": 0,
+            "trackers_inserted": 0
+        }
+
+    print(f"📥 Received data from extension: {len(request.trackers)} trackers, {len(request.cookies)} cookies")
+    print(f"👤 User: {request.email}, Device: {request.deviceId}")
 
     cookies_inserted = 0
     trackers_inserted = 0
@@ -264,6 +326,7 @@ async def upload_tracker_data(request: UploadRequest):
                 request.email,
                 request.deviceId
             )
+            print(f"✅ Inserted {cookies_inserted} cookies")
 
         # Insert trackers
         if request.trackers:
@@ -272,6 +335,7 @@ async def upload_tracker_data(request: UploadRequest):
                 request.email,
                 request.deviceId
             )
+            print(f"✅ Inserted {trackers_inserted} trackers")
 
         # Enrich any unknown trackers in background
         try:
