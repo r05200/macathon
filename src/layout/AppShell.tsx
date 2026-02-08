@@ -10,12 +10,14 @@ const NAV_ITEMS = [
   { path: "/app/overview", label: "Overview" },
   { path: "/app/trackers", label: "Breakdown" },
   { path: "/app/trends", label: "Trends" },
+  { path: "/app/security", label: "Security Report" },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
   "/app/overview": "Overview",
   "/app/trackers": "Breakdown",
   "/app/trends": "Trends",
+  "/app/security": "Security Report",
 };
 
 export default function AppShell() {

@@ -25,6 +25,7 @@ type OverviewStats = {
 type TimeSeriesPoint = {
   date: string
   value: number
+  isReal?: boolean
 }
 
 type CategoryPoint = {
@@ -119,30 +120,57 @@ export default function Overview() {
             No data yet
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={timeSeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--cyber-border)" />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: "var(--cyber-text-muted)", fontSize: 10 }}
-                tickFormatter={(v: string) => v.slice(5)}
-                stroke="var(--cyber-border)"
-              />
-              <YAxis
-                tick={{ fill: "var(--cyber-text-muted)", fontSize: 10 }}
-                stroke="var(--cyber-border)"
-                width={45}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="var(--cyber-accent)"
-                strokeWidth={2}
-                dot={false}
-                name="Events"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            <div className="flex items-center gap-4 mb-3 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[var(--cyber-accent)]" />
+                <span className="text-[var(--cyber-text-muted)]">Real Data</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-0.5 bg-[var(--cyber-accent)] opacity-50" />
+                <span className="text-[var(--cyber-text-muted)]">Demo Data</span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={timeSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--cyber-border)" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "var(--cyber-text-muted)", fontSize: 10 }}
+                  tickFormatter={(v: string) => v.slice(5)}
+                  stroke="var(--cyber-border)"
+                />
+                <YAxis
+                  tick={{ fill: "var(--cyber-text-muted)", fontSize: 10 }}
+                  stroke="var(--cyber-border)"
+                  width={45}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--cyber-accent)"
+                  strokeWidth={2}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props
+                    if (payload.isReal) {
+                      return (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={4}
+                          fill="var(--cyber-accent)"
+                          stroke="var(--cyber-bg)"
+                          strokeWidth={2}
+                        />
+                      )
+                    }
+                    return null
+                  }}
+                  name="Events"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </>
         )}
       </Panel>
 

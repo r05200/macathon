@@ -3,6 +3,7 @@ import AppShell from "./layout/AppShell";
 import Overview from "./pages/Overview";
 import Trackers from "./pages/Trackers";
 import Trends from "./pages/Trends";
+import SecurityReport from "./pages/SecurityReport";
 
 import { useAuth0 } from "@auth0/auth0-react";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -93,16 +94,17 @@ function Landing() {
     );
   }
 
+  // Check authenticated BEFORE isCallback so users redirect immediately after login
+  if (isAuthenticated) {
+    return <Navigate to="/app/overview" replace />;
+  }
+
   if (isLoading || isCallback) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-600">
         Loading…
       </div>
     );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/app/overview" replace />;
   }
 
   return (
@@ -135,6 +137,7 @@ export default function App() {
         <Route path="overview" element={<Overview />} />
         <Route path="trackers" element={<Trackers />} />
         <Route path="trends" element={<Trends />} />
+        <Route path="security" element={<SecurityReport />} />
       </Route>
     </Routes>
   );

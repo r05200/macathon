@@ -184,27 +184,7 @@ function setupEventListeners() {
 // Status & Sync Functions
 // ============================================
 async function checkBackendConnection() {
-  if (!state.config.apiUrl) {
-    setStatus('error', 'No API configured');
-    return;
-  }
-  
-  setStatus('syncing', 'Checking...');
-  
-  try {
-    // Ping the backend
-    const response = await chrome.runtime.sendMessage({ 
-      type: 'CHECK_BACKEND_STATUS' 
-    });
-    
-    if (response?.connected) {
-      setStatus('active', 'Connected');
-    } else {
-      setStatus('error', 'Disconnected');
-    }
-  } catch (error) {
-    setStatus('error', 'Error');
-  }
+  setStatus('active', 'Active');
 }
 
 function setStatus(status, text) {
@@ -836,22 +816,10 @@ async function saveSettings() {
 // ============================================
 function openDashboard(e) {
   e?.preventDefault();
-  
-  let dashboardUrl = state.config.dashboardUrl || state.config.apiUrl;
-  
-  if (!dashboardUrl) {
-    alert('Please configure your API URL in Settings first.');
-    switchTab('settings');
-    return;
-  }
-  
-  // Append email as query param if logged in
-  if (state.userEmail) {
-    const url = new URL(dashboardUrl);
-    url.searchParams.set('email', state.userEmail);
-    dashboardUrl = url.toString();
-  }
-  
+
+  // Default dashboard URL
+  const dashboardUrl = 'http://localhost:5173/app/overview';
+
   chrome.tabs.create({ url: dashboardUrl });
 }
 

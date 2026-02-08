@@ -32,6 +32,11 @@ const Root = (
         useRefreshTokens={true}
         onRedirectCallback={(appState) => {
           console.log("[Auth] Redirect callback:", appState);
+          window.history.replaceState(
+            {},
+            document.title,
+            appState?.returnTo || window.location.pathname
+          );
         }}
       >
         <BrowserRouter>

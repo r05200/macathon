@@ -23,6 +23,9 @@ export default function ProtectedRoute({ children }: Props) {
     }
   }, [isLoading, isAuthenticated, isCallback, loginWithRedirect, location.pathname, location.search]);
 
+  // Check authenticated BEFORE isCallback so users see content immediately after login
+  if (isAuthenticated) return <>{children}</>;
+
   if (isLoading || isCallback) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-600">
@@ -30,8 +33,6 @@ export default function ProtectedRoute({ children }: Props) {
       </div>
     );
   }
-
-  if (isAuthenticated) return <>{children}</>;
 
   return null;
 }
