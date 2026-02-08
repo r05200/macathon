@@ -464,10 +464,10 @@ async def get_overview(email: str = ""):
             day = today - timedelta(days=i)
             day_str = day.isoformat()
             if day_str in real_daily:
-                time_series.append({"date": day_str, "value": real_daily[day_str]})
+                time_series.append({"date": day_str, "value": real_daily[day_str], "isReal": True})
             else:
                 # Dummy data for days without real data
-                time_series.append({"date": day_str, "value": random.randint(80, 250)})
+                time_series.append({"date": day_str, "value": random.randint(80, 250), "isReal": False})
 
         # Categories ranked by count
         categories = [
@@ -517,11 +517,11 @@ async def get_trends(days: int = 7, email: str = ""):
             day = today - timedelta(days=i)
             day_str = day.isoformat()
             if day_str in real_tracker_daily:
-                tracker_series.append({"date": day_str, "count": real_tracker_daily[day_str]})
+                tracker_series.append({"date": day_str, "count": real_tracker_daily[day_str], "isReal": True})
             else:
-                tracker_series.append({"date": day_str, "count": random.randint(30, 90)})
+                tracker_series.append({"date": day_str, "count": random.randint(30, 90), "isReal": False})
             # Cookies: dummy data since we can't access cookies DB yet
-            cookie_series.append({"date": day_str, "count": random.randint(10, 50)})
+            cookie_series.append({"date": day_str, "count": random.randint(10, 50), "isReal": False})
 
         return {
             "trackerDaily": tracker_series,
