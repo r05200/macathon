@@ -5,25 +5,18 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
   Legend,
 } from "recharts"
 import Panel from "../components/Panel.tsx"
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const
 type Range = (typeof TIME_RANGES)[number]
 
 type DailyCount = { date: string; count: number }
 type MergedPoint = { date: string; trackers: number; cookies: number }
-
-function generateMockDaily(days: number): DailyCount[] {
-  return Array.from({ length: days }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (days - 1 - i))
-    return { date: d.toISOString().slice(0, 10), count: 30 + Math.round(Math.random() * 60) }
-  })
-}
 
 function rangeToDays(range: Range): number {
   if (range === "24h") return 1
@@ -51,12 +44,21 @@ export default function Trends() {
   const [range, setRange] = useState<Range>("7d")
   const [trackerDaily, setTrackerDaily] = useState<DailyCount[]>([])
   const [cookieDaily, setCookieDaily] = useState<DailyCount[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Future: replace with API calls
     const days = rangeToDays(range)
-    setTrackerDaily(generateMockDaily(days))
-    setCookieDaily(generateMockDaily(days))
+    setLoading(true)
+    fetch(`${API_URL}/api/trends?days=${days}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setTrackerDaily(data.trackerDaily || [])
+        setCookieDaily(data.cookieDaily || [])
+      })
+      .catch((err) => {
+        console.error("Failed to fetch trends:", err)
+      })
+      .finally(() => setLoading(false))
   }, [range])
 
   const merged = useMemo(() => mergeDaily(trackerDaily, cookieDaily), [trackerDaily, cookieDaily])
@@ -80,13 +82,17 @@ export default function Trends() {
           ))}
         </div>
 
-        {merged.length === 0 ? (
+        {loading ? (
+          <div className="h-64 flex items-center justify-center text-[var(--cyber-text-muted)] text-sm">
+            Loading trends...
+          </div>
+        ) : merged.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-[var(--cyber-text-muted)] text-sm">
             <span className="text-2xl mb-2 opacity-40">[ ]</span>
             No data yet
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={350}>
             <LineChart data={merged}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--cyber-border)" />
               <XAxis
@@ -99,15 +105,6 @@ export default function Trends() {
                 tick={{ fill: "var(--cyber-text-muted)", fontSize: 10 }}
                 stroke="var(--cyber-border)"
                 width={40}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--cyber-surface)",
-                  border: "1px solid var(--cyber-border)",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  color: "var(--cyber-text)",
-                }}
               />
               <Legend
                 wrapperStyle={{ fontSize: 11, color: "var(--cyber-text-muted)" }}

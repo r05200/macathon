@@ -18,9 +18,11 @@ import {
 // Configuration
 // ============================================
 const DEFAULT_CONFIG = {
-  apiUrl: '',
+  apiUrl: 'http://localhost:8000',  // Backend API endpoint
   syncIntervalMinutes: 15,
-  dashboardUrl: ''
+  dashboardUrl: '',
+  autoUploadEnabled: true,  // Enable automatic data uploads
+  uploadIntervalSeconds: 20  // Upload frequency
 };
 
 let config = { ...DEFAULT_CONFIG };
@@ -120,6 +122,9 @@ async function initialize() {
 
   // Set up periodic sync
   setupSyncAlarm();
+  
+  // Set up periodic data upload (every 20 seconds)
+  setupUploadAlarm();
 
   // Initial sync if API is configured
   if (config.apiUrl && userEmail) {
@@ -146,9 +151,32 @@ function setupSyncAlarm() {
   });
 }
 
+function setupUploadAlarm() {
+  if (!config.autoUploadEnabled) {
+    console.log('Auto-upload disabled, skipping upload alarm setup');
+    chrome.alarms.clear('uploadData');
+    return;
+  }
+  
+  // Clear existing alarm
+  chrome.alarms.clear('uploadData');
+  
+  // Create new alarm - runs every 20 seconds
+  // Note: Chrome alarms minimum is 1 minute for unpacked extensions in development
+  // For production (packed), we can use delayInMinutes with fractional values
+  // For now, we'll use 1 minute intervals, but you can adjust
+  chrome.alarms.create('uploadData', {
+    periodInMinutes: config.uploadIntervalSeconds / 60  // 20 seconds = 0.333 minutes
+  });
+  
+  console.log(`📤 Upload alarm set for every ${config.uploadIntervalSeconds} seconds`);
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'syncBlocklist') {
     syncBlocklistFromBackend();
+  } else if (alarm.name === 'uploadData') {
+    periodicUploadData();
   }
 });
 
@@ -620,6 +648,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       config = { ...config, ...message.config };
       chrome.storage.local.set({ config });
       setupSyncAlarm(); // Reset alarm with new interval
+      setupUploadAlarm(); // Reset upload alarm with new settings
       sendResponse({ success: true });
       break;
       
@@ -628,6 +657,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .then(() => sendResponse({ success: true }))
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
+      
+    case 'FORCE_UPLOAD':
+      periodicUploadData()
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true; // Keep channel open for async
       
     case 'UPLOAD_TRACKER_DATA':
       uploadTrackerData(message.data)
@@ -686,11 +721,82 @@ async function clearAllData() {
 
   // Clear alarms
   chrome.alarms.clear('syncBlocklist');
+  chrome.alarms.clear('uploadData');
 }
 
 // ============================================
 // Upload Tracker Data to Backend
 // ============================================
+async function periodicUploadData() {
+  if (!config.autoUploadEnabled) {
+    console.log('Auto-upload disabled, skipping');
+    return { success: false, error: 'Auto-upload disabled' };
+  }
+  
+  if (!config.apiUrl) {
+    console.log('⚠️ No API URL configured, skipping upload');
+    return { success: false, error: 'No API URL configured' };
+  }
+  
+  // Collect all trackers from all tabs
+  const allTrackers = [];
+  const allCookies = [];
+  
+  for (const tabId in detectedTrackers) {
+    if (detectedTrackers[tabId]) {
+      allTrackers.push(...detectedTrackers[tabId]);
+    }
+  }
+  
+  for (const tabId in detectedCookies) {
+    if (detectedCookies[tabId]) {
+      allCookies.push(...detectedCookies[tabId]);
+    }
+  }
+  
+  // Only upload if we have data
+  if (allTrackers.length === 0 && allCookies.length === 0) {
+    console.log('📭 No new data to upload');
+    return { success: true, message: 'No data to upload' };
+  }
+  
+  console.log(`📤 Uploading ${allTrackers.length} trackers and ${allCookies.length} cookies...`);
+  
+  try {
+    const response = await fetch(`${config.apiUrl}/api/trackers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: userEmail || 'anonymous@extension.local',
+        deviceId: deviceId,
+        trackers: allTrackers,
+        cookies: allCookies,
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Backend returned ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('✅ Data uploaded successfully:', result);
+    
+    // Clear uploaded data from memory to avoid duplicates
+    detectedTrackers = {};
+    detectedCookies = {};
+    await chrome.storage.session.set({ detectedTrackers, detectedCookies });
+    
+    return { success: true, result };
+    
+  } catch (error) {
+    console.error('❌ Failed to upload data:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 async function uploadTrackerData(data) {
   if (!config.apiUrl || !userEmail) {
     return { success: false, error: 'Not configured' };

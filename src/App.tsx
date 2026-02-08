@@ -2,9 +2,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import AppShell from "./layout/AppShell";
 import Overview from "./pages/Overview";
 import Trackers from "./pages/Trackers";
-import Companies from "./pages/Companies";
 import Trends from "./pages/Trends";
-import Settings from "./pages/Settings";
 
 import { useAuth0 } from "@auth0/auth0-react";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -136,9 +134,7 @@ export default function App() {
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="overview" element={<Overview />} />
         <Route path="trackers" element={<Trackers />} />
-        <Route path="companies" element={<Companies />} />
         <Route path="trends" element={<Trends />} />
-        <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>
   );

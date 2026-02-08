@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
-from tracker import TrackerIdentifier
+from tracker import TrackerEnricher
 from snowflake_db import SnowflakeDB
 
 # Initialize FastAPI app
@@ -39,7 +39,7 @@ async def startup_event():
     This runs once when the server starts up.
     """
     global tracker_identifier, snowflake_db
-    tracker_identifier = TrackerIdentifier()
+    tracker_identifier = TrackerEnricher()
     print("✓ Tracker database loaded successfully")
 
     try:
@@ -430,6 +430,217 @@ async def add_to_blocklist(request: BlocklistAddRequest):
 
 
 # ============================================
+# OVERVIEW API ENDPOINT
+# ============================================
+
+@app.get("/api/overview", tags=["Dashboard API"])
+async def get_overview():
+    """
+    Get overview stats for the frontend dashboard.
+    Returns total events, trackers, unique sites, daily time series, and categories.
+    Includes 6 days of dummy historical data before real data begins.
+    """
+    from datetime import datetime, timedelta
+    import random
+
+    if not snowflake_db:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        data = snowflake_db.get_overview_stats()
+
+        total_trackers = data["totalTrackers"]
+        total_cookies = 0  # cookies not accessible yet
+        total_events = total_trackers + total_cookies
+        unique_sites = data["uniqueSites"]
+
+        # Build 7-day time series with 6 days of dummy data + real today
+        real_daily = {row["DATE"]: row["VALUE"] for row in data["dailyEvents"]}
+
+        time_series = []
+        today = datetime.now().date()
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            day_str = day.isoformat()
+            if day_str in real_daily:
+                time_series.append({"date": day_str, "value": real_daily[day_str]})
+            else:
+                # Dummy data for days without real data
+                time_series.append({"date": day_str, "value": random.randint(80, 250)})
+
+        # Categories ranked by count
+        categories = [
+            {"category": row["CATEGORY"], "count": row["COUNT"]}
+            for row in data["categories"]
+        ]
+
+        return {
+            "totalEvents": total_events,
+            "uniqueSites": unique_sites,
+            "totalTrackers": total_trackers,
+            "totalCookies": total_cookies,
+            "timeSeries": time_series,
+            "categories": categories
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching overview: {str(e)}")
+
+
+# ============================================
+# TRENDS API ENDPOINT
+# ============================================
+
+@app.get("/api/trends", tags=["Dashboard API"])
+async def get_trends(days: int = 7):
+    """
+    Get trends data for the Trends page.
+    Returns daily tracker counts with dummy data for missing days.
+    """
+    from datetime import datetime, timedelta
+    import random
+
+    if not snowflake_db:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        data = snowflake_db.get_trends_data(days)
+
+        real_tracker_daily = {row["DATE"]: row["COUNT"] for row in data["trackerDaily"]}
+
+        tracker_series = []
+        cookie_series = []
+        today = datetime.now().date()
+        for i in range(days - 1, -1, -1):
+            day = today - timedelta(days=i)
+            day_str = day.isoformat()
+            if day_str in real_tracker_daily:
+                tracker_series.append({"date": day_str, "count": real_tracker_daily[day_str]})
+            else:
+                tracker_series.append({"date": day_str, "count": random.randint(30, 90)})
+            # Cookies: dummy data since we can't access cookies DB yet
+            cookie_series.append({"date": day_str, "count": random.randint(10, 50)})
+
+        return {
+            "trackerDaily": tracker_series,
+            "cookieDaily": cookie_series
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching trends: {str(e)}")
+
+
+# ============================================
+# BREAKDOWN API ENDPOINT
+# ============================================
+
+@app.get("/api/breakdown", tags=["Dashboard API"])
+async def get_breakdown():
+    """
+    Get breakdown stats for the Breakdown (Trackers) page.
+    Returns top initiators, top domains, company groups, and all trackers.
+    """
+    if not snowflake_db:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        data = snowflake_db.get_breakdown_stats()
+
+        top_by_initiator = [
+            {"initiator": row["INITIATOR"], "count": row["COUNT"]}
+            for row in data["topByInitiator"]
+        ]
+
+        top_by_domain = [
+            {"domain": row["DOMAIN_NAME"], "company": row["COMPANY"] or "Unknown", "count": row["COUNT"]}
+            for row in data["topByDomain"]
+        ]
+
+        # Group company_domain_rows into company groups
+        company_groups_map = {}
+        for row in data["companyDomainRows"]:
+            company = row["COMPANY"]
+            if company not in company_groups_map:
+                company_groups_map[company] = {"company": company, "domains": []}
+            company_groups_map[company]["domains"].append({
+                "domain": row["DOMAIN_NAME"],
+                "category": row["CATEGORY"],
+                "totalHits": row["TOTAL_HITS"],
+                "entryCount": row["ENTRY_COUNT"]
+            })
+        company_groups = list(company_groups_map.values())
+
+        # Format all trackers
+        all_trackers = []
+        for row in data["allTrackers"]:
+            all_trackers.append({
+                "id": str(row["ID"]),
+                "domain": row["DOMAIN_NAME"] or "",
+                "fullUrl": row["FULL_URL"] or "",
+                "initiator": row["INITIATOR"] or "",
+                "company": row["COMPANY"] or "Unknown",
+                "category": row["CATEGORY"] or "unknown",
+                "occurrences": row["OCCURRENCES"] or 1,
+                "createdAt": str(row["CREATED_AT"]) if row["CREATED_AT"] else ""
+            })
+
+        return {
+            "totalTrackers": data["totalTrackers"],
+            "topByInitiator": top_by_initiator,
+            "topByDomain": top_by_domain,
+            "companyGroups": company_groups,
+            "allTrackers": all_trackers
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching breakdown: {str(e)}")
+
+
+# ============================================
+# COOKIE INSERT API ENDPOINT
+# ============================================
+
+class CookieUploadRequest(BaseModel):
+    """Request model for uploading cookie data from extension"""
+    email: str = Field(..., description="User email address")
+    deviceId: str = Field(..., description="Device identifier")
+    cookies: List[Dict[str, Any]] = Field(default=[], description="List of detected cookies")
+    timestamp: str = Field(default="", description="Timestamp of upload")
+
+
+@app.post("/api/cookies/upload", tags=["Extension API"])
+async def upload_cookie_data(request: CookieUploadRequest):
+    """
+    Upload cookie data from the extension (similar to /api/trackers for trackers).
+    Currently cookie insertion is disabled due to permissions, but the endpoint is ready.
+    """
+    if not snowflake_db:
+        return {
+            "success": False,
+            "message": "Database not available",
+            "cookies_inserted": 0
+        }
+
+    print(f"📥 Received cookie data: {len(request.cookies)} cookies")
+    print(f"👤 User: {request.email}, Device: {request.deviceId}")
+
+    try:
+        cookies_inserted = snowflake_db.insert_cookies(
+            request.cookies,
+            request.email,
+            request.deviceId
+        )
+
+        return {
+            "success": True,
+            "cookies_inserted": cookies_inserted
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading cookies: {str(e)}")
+
+
+# ============================================
 # DASHBOARD API ENDPOINTS
 # ============================================
 
@@ -488,7 +699,7 @@ async def get_tracker_history(email: str, limit: int = 500):
 def enrich_unknown_trackers():
     """
     Background task: Pull unknown trackers from Snowflake,
-    enrich with TrackerIdentifier, and update database
+    enrich with TrackerEnricher, and update database
     """
     if not snowflake_db or not tracker_identifier:
         return

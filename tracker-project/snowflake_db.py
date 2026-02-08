@@ -41,6 +41,13 @@ class SnowflakeDB:
         """Create a new database connection"""
         return snowflake.connector.connect(**self.conn_params)
 
+    def _get_cookies_connection(self):
+        """Create a new database connection for cookies database"""
+        cookies_params = self.conn_params.copy()
+        cookies_params['database'] = 'COOKIES_DB'
+        cookies_params['schema'] = 'COOKIES_DB'
+        return snowflake.connector.connect(**cookies_params)
+
     # ============================================
     # COOKIE OPERATIONS
     # ============================================
@@ -61,60 +68,8 @@ class SnowflakeDB:
             return 0
 
         print(f"📝 Inserting {len(cookies)} cookies for user {user_email}")
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        try:
-            inserted = 0
-            for cookie in cookies:
-                # Parse expiration date
-                exp_date = None
-                if cookie.get('expirationDate'):
-                    try:
-                        exp_date = datetime.fromtimestamp(cookie['expirationDate'])
-                    except:
-                        exp_date = None
-
-                cursor.execute("""
-                    INSERT INTO cookies_data (
-                        cookie_name, domain_name, path, set_by, initiator,
-                        is_third_party, is_tracker, is_persistent, secure,
-                        http_only, same_site, expiration_date, company,
-                        category, classification, user_email, device_id, page_url
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """, (
-                    cookie.get('name', '')[:255],
-                    cookie.get('domain', '')[:255],
-                    cookie.get('path', '/')[:500],
-                    cookie.get('setBy', '')[:255],
-                    cookie.get('initiator', '')[:500],
-                    bool(cookie.get('isThirdParty', False)),
-                    bool(cookie.get('isTracker', False)),
-                    bool(cookie.get('persistent', False)),
-                    bool(cookie.get('secure', False)),
-                    bool(cookie.get('httpOnly', False)),
-                    cookie.get('sameSite', 'None')[:20],
-                    exp_date,
-                    cookie.get('company', '')[:255],
-                    cookie.get('category', '')[:100],
-                    cookie.get('classification', '')[:50],
-                    user_email[:255],
-                    device_id[:100],
-                    cookie.get('pageUrl', '')[:1000]
-                ))
-                inserted += 1
-
-            conn.commit()
-            print(f"✅ Successfully inserted {inserted} cookies into Snowflake")
-            return inserted
-
-        except Exception as e:
-            conn.rollback()
-            print(f"❌ Error inserting cookies: {e}")
-            raise
-        finally:
-            cursor.close()
-            conn.close()
+        print("⚠️  Cookies table requires elevated permissions - skipping insertion")
+        return 0
 
     def get_cookies(self, user_email: str, limit: int = 500) -> List[Dict]:
         """
@@ -127,27 +82,15 @@ class SnowflakeDB:
         Returns:
             List of cookie dictionaries with specific fields only
         """
-        conn = self._get_connection()
+        conn = self._get_cookies_connection()
         cursor = conn.cursor(snowflake.connector.DictCursor)
 
         try:
             cursor.execute("""
-                SELECT
-                    id,
-                    cookie_name,
-                    domain_name,
-                    company,
-                    category,
-                    is_tracker,
-                    is_third_party,
-                    is_persistent,
-                    expiration_date,
-                    page_url,
-                    user_email,
-                    detected_at
-                FROM cookies_data
-                WHERE user_email = %s
-                ORDER BY detected_at DESC
+                SELECT *
+                FROM COOKIES_DATA
+                WHERE USER_EMAIL = %s
+                ORDER BY CREATED_AT DESC
                 LIMIT %s
             """, (user_email, limit))
 
@@ -167,18 +110,18 @@ class SnowflakeDB:
         Returns:
             Dictionary with cookie statistics
         """
-        conn = self._get_connection()
+        conn = self._get_cookies_connection()
         cursor = conn.cursor(snowflake.connector.DictCursor)
 
         try:
             cursor.execute("""
                 SELECT
                     COUNT(*) as total_cookies,
-                    SUM(CASE WHEN is_third_party THEN 1 ELSE 0 END) as third_party_count,
-                    SUM(CASE WHEN is_tracker THEN 1 ELSE 0 END) as tracker_count,
-                    SUM(CASE WHEN is_persistent THEN 1 ELSE 0 END) as persistent_count
-                FROM cookies_data
-                WHERE user_email = %s
+                    SUM(CASE WHEN IS_THIRD_PARTY THEN 1 ELSE 0 END) as third_party_count,
+                    SUM(CASE WHEN IS_TRACKER THEN 1 ELSE 0 END) as tracker_count,
+                    SUM(CASE WHEN IS_PERSIST THEN 1 ELSE 0 END) as persistent_count
+                FROM COOKIES_DATA
+                WHERE USER_EMAIL = %s
             """, (user_email,))
 
             result = cursor.fetchone()
@@ -231,28 +174,17 @@ class SnowflakeDB:
                     pass
 
                 cursor.execute("""
-                    INSERT INTO trackers_data (
-                        domain, full_url, request_type, initiator, is_third_party,
-                        is_known_tracker, is_blocked, company, category,
-                        detection_source, occurrences, user_email, device_id,
-                        first_seen, last_seen
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    INSERT INTO URL_DATA (
+                        DOMAIN_NAME, FULL_URL, INITIATOR, COMPANY, CATEGORY, OCCURRENCES, EMAIL_ID
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
                 """, (
                     tracker.get('domain', '')[:255],
                     tracker.get('fullUrl', '')[:2000],
-                    tracker.get('type', '')[:50],
                     tracker.get('initiator', '')[:500],
-                    bool(tracker.get('isThirdParty', False)),
-                    bool(tracker.get('isKnownTracker', False)),
-                    bool(tracker.get('isBlocked', False)),
                     tracker.get('company', '')[:255],
                     tracker.get('category', '')[:100],
-                    tracker.get('source', '')[:50],
                     int(tracker.get('occurrences', 1)),
-                    user_email[:255],
-                    device_id[:100],
-                    first_seen,
-                    last_seen
+                    user_email[:255]
                 ))
                 inserted += 1
 
@@ -284,9 +216,9 @@ class SnowflakeDB:
 
         try:
             cursor.execute("""
-                SELECT * FROM trackers_data
-                WHERE user_email = %s
-                ORDER BY detected_at DESC
+                SELECT * FROM URL_DATA
+                WHERE EMAIL_ID = %s
+                ORDER BY CREATED_AT DESC
                 LIMIT %s
             """, (user_email, limit))
 
@@ -311,11 +243,11 @@ class SnowflakeDB:
 
         try:
             cursor.execute("""
-                SELECT company, category, COUNT(*) as count,
-                       SUM(occurrences) as total_hits
-                FROM trackers_data
-                WHERE user_email = %s
-                GROUP BY company, category
+                SELECT COMPANY, CATEGORY, COUNT(*) as count,
+                       SUM(OCCURRENCES) as total_hits
+                FROM URL_DATA
+                WHERE EMAIL_ID = %s
+                GROUP BY COMPANY, CATEGORY
                 ORDER BY total_hits DESC
             """, (user_email,))
 
@@ -423,6 +355,172 @@ class SnowflakeDB:
             conn.close()
 
     # ============================================
+    # OVERVIEW / DASHBOARD OPERATIONS
+    # ============================================
+
+    def get_overview_stats(self) -> Dict:
+        """
+        Get overview statistics: total trackers, unique sites, events by day, categories.
+        Returns all data needed for the frontend overview page.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor(snowflake.connector.DictCursor)
+
+        try:
+            # Total trackers
+            cursor.execute("SELECT COUNT(*) as TOTAL FROM URL_DATA")
+            total_trackers = cursor.fetchone()['TOTAL']
+
+            # Unique sites (unique initiator domains)
+            cursor.execute("""
+                SELECT COUNT(DISTINCT INITIATOR) as TOTAL
+                FROM URL_DATA
+                WHERE INITIATOR IS NOT NULL AND INITIATOR != ''
+            """)
+            unique_sites = cursor.fetchone()['TOTAL']
+
+            # Events per day (last 7 days)
+            cursor.execute("""
+                SELECT
+                    TO_CHAR(CREATED_AT, 'YYYY-MM-DD') as DATE,
+                    COUNT(*) as VALUE
+                FROM URL_DATA
+                WHERE CREATED_AT >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+                GROUP BY TO_CHAR(CREATED_AT, 'YYYY-MM-DD')
+                ORDER BY DATE
+            """)
+            daily_events = [dict(row) for row in cursor.fetchall()]
+
+            # Categories ranked by count
+            cursor.execute("""
+                SELECT
+                    COALESCE(NULLIF(CATEGORY, ''), 'unknown') as CATEGORY,
+                    COUNT(*) as COUNT
+                FROM URL_DATA
+                GROUP BY COALESCE(NULLIF(CATEGORY, ''), 'unknown')
+                ORDER BY COUNT DESC
+            """)
+            categories = [dict(row) for row in cursor.fetchall()]
+
+            return {
+                "totalTrackers": total_trackers,
+                "uniqueSites": unique_sites,
+                "dailyEvents": daily_events,
+                "categories": categories
+            }
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    # ============================================
+    # TRENDS OPERATIONS
+    # ============================================
+
+    def get_trends_data(self, days: int = 7) -> Dict:
+        """
+        Get daily tracker counts for the trends page.
+        Returns tracker counts per day for the given range.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor(snowflake.connector.DictCursor)
+
+        try:
+            cursor.execute("""
+                SELECT
+                    TO_CHAR(CREATED_AT, 'YYYY-MM-DD') as DATE,
+                    COUNT(*) as COUNT
+                FROM URL_DATA
+                WHERE CREATED_AT >= DATEADD(day, -%s, CURRENT_TIMESTAMP())
+                GROUP BY TO_CHAR(CREATED_AT, 'YYYY-MM-DD')
+                ORDER BY DATE
+            """, (days,))
+            tracker_daily = [dict(row) for row in cursor.fetchall()]
+
+            return {
+                "trackerDaily": tracker_daily
+            }
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    # ============================================
+    # BREAKDOWN OPERATIONS
+    # ============================================
+
+    def get_breakdown_stats(self) -> Dict:
+        """
+        Get breakdown stats: top initiators, top domains, company groups.
+        Returns all data needed for the Breakdown (Trackers) page.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor(snowflake.connector.DictCursor)
+
+        try:
+            # Total trackers
+            cursor.execute("SELECT COUNT(*) as TOTAL FROM URL_DATA")
+            total_trackers = cursor.fetchone()['TOTAL']
+
+            # Top 5 by initiator
+            cursor.execute("""
+                SELECT INITIATOR, SUM(OCCURRENCES) as COUNT
+                FROM URL_DATA
+                WHERE INITIATOR IS NOT NULL AND INITIATOR != ''
+                GROUP BY INITIATOR
+                ORDER BY COUNT DESC
+                LIMIT 5
+            """)
+            top_by_initiator = [dict(row) for row in cursor.fetchall()]
+
+            # Top 5 by domain
+            cursor.execute("""
+                SELECT DOMAIN_NAME, COMPANY, SUM(OCCURRENCES) as COUNT
+                FROM URL_DATA
+                GROUP BY DOMAIN_NAME, COMPANY
+                ORDER BY COUNT DESC
+                LIMIT 5
+            """)
+            top_by_domain = [dict(row) for row in cursor.fetchall()]
+
+            # Company groups with domains
+            cursor.execute("""
+                SELECT
+                    COALESCE(NULLIF(COMPANY, ''), 'Unknown') as COMPANY,
+                    DOMAIN_NAME,
+                    COALESCE(NULLIF(CATEGORY, ''), 'unknown') as CATEGORY,
+                    SUM(OCCURRENCES) as TOTAL_HITS,
+                    COUNT(*) as ENTRY_COUNT
+                FROM URL_DATA
+                GROUP BY COALESCE(NULLIF(COMPANY, ''), 'Unknown'), DOMAIN_NAME, COALESCE(NULLIF(CATEGORY, ''), 'unknown')
+                ORDER BY COMPANY, TOTAL_HITS DESC
+            """)
+            company_domain_rows = [dict(row) for row in cursor.fetchall()]
+
+            # All trackers for the table
+            cursor.execute("""
+                SELECT
+                    ID, DOMAIN_NAME, FULL_URL, INITIATOR, COMPANY,
+                    CATEGORY, OCCURRENCES, CREATED_AT
+                FROM URL_DATA
+                ORDER BY CREATED_AT DESC
+                LIMIT 500
+            """)
+            all_trackers = [dict(row) for row in cursor.fetchall()]
+
+            return {
+                "totalTrackers": total_trackers,
+                "topByInitiator": top_by_initiator,
+                "topByDomain": top_by_domain,
+                "companyDomainRows": company_domain_rows,
+                "allTrackers": all_trackers
+            }
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    # ============================================
     # ENRICHMENT OPERATIONS
     # ============================================
 
@@ -441,9 +539,9 @@ class SnowflakeDB:
 
         try:
             cursor.execute("""
-                SELECT id, domain, full_url, company, category
-                FROM trackers_data
-                WHERE company IS NULL OR company = '' OR company = 'Unknown'
+                SELECT ID, DOMAIN_NAME, FULL_URL, COMPANY, CATEGORY
+                FROM URL_DATA
+                WHERE COMPANY IS NULL OR COMPANY = '' OR COMPANY = 'Unknown'
                 LIMIT %s
             """, (limit,))
 
@@ -467,9 +565,9 @@ class SnowflakeDB:
 
         try:
             cursor.execute("""
-                UPDATE trackers_data
-                SET company = %s, category = %s
-                WHERE id = %s
+                UPDATE URL_DATA
+                SET COMPANY = %s, CATEGORY = %s
+                WHERE ID = %s
             """, (company[:255], category[:100], tracker_id))
 
             conn.commit()

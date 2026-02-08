@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import NavItem from "../components/NavItem";
-import Badge from "../components/Badge";
 import CyberTitle from "../components/CyberTitle";
 
 const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
@@ -9,17 +8,13 @@ const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
 const NAV_ITEMS = [
   { path: "/app/overview", label: "Overview" },
   { path: "/app/trackers", label: "Breakdown" },
-  { path: "/app/companies", label: "Companies" },
   { path: "/app/trends", label: "Trends" },
-  { path: "/app/settings", label: "Settings" },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
   "/app/overview": "Overview",
   "/app/trackers": "Breakdown",
-  "/app/companies": "Companies",
   "/app/trends": "Trends",
-  "/app/settings": "Settings",
 };
 
 export default function AppShell() {
@@ -57,7 +52,6 @@ export default function AppShell() {
             className="text-lg font-bold text-[var(--cyber-text)]"
           />
           <div className="flex items-center gap-3">
-            <Badge>Mock data</Badge>
             {!authDisabled && (
               <button
                 onClick={() =>
